@@ -2,6 +2,9 @@ import 'dotenv/config'; // Garante que as variáveis de ambiente carreguem antes
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt'; // <-- ADICIONADO IMPORT DO BCRYPT AQUI
+import swaggerUi from 'swagger-ui-express'; // <-- ADICIONADO AQUI
+import fs from 'fs';
+
 
 // Imports dos seus Models
 import { 
@@ -22,6 +25,16 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+
+// --- CONFIGURAÇÃO DO SWAGGER ---
+let swaggerDocument = {};
+try {
+  swaggerDocument = JSON.parse(fs.readFileSync('./swagger-output.json', 'utf8'));
+} catch (error) {
+  console.log("Aviso: arquivo swagger-output.json ainda não foi gerado.");
+}
+app.use('/doc', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
 
 // ==========================================
 // ROTAS DE CLIENTES
