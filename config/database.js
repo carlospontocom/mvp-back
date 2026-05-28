@@ -1,4 +1,4 @@
-import 'dotenv/config'; // <-- ADICIONE ISSO NA PRIMEIRA LINHA
+import 'dotenv/config'; 
 import mysql from 'mysql2/promise';
 
 // Criando o pool de conexões

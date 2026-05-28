@@ -3,7 +3,6 @@ import bcrypt from 'bcrypt';
 
 // 1. Criar novo cliente (INSERT) - Agora com senha criptografada
 export async function criarCliente(nome, email, senha, data_nascimento) {
-  // Criptografa a senha antes de enviar para o TiDB Cloud
   const senhaCriptografada = await bcrypt.hash(senha, 10);
 
   const [result] = await pool.query(
