@@ -1,12 +1,12 @@
-import 'dotenv/config'; // Garante que as variáveis de ambiente carreguem antes de tudo
+import 'dotenv/config';
 import express from 'express';
+import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import { autenticarToken } from './middlewares/auth.js';
 import swaggerUi from 'swagger-ui-express';
 import fs from 'fs';
 
-// Imports dos seus Models
 import {
   buscarTodosClientes,
   criarCliente,
@@ -24,9 +24,16 @@ import {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// --- CORS ---
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json());
 
-// --- CONFIGURAÇÃO DO SWAGGER ---
+// --- SWAGGER ---
 let swaggerDocument = {};
 try {
   swaggerDocument = JSON.parse(fs.readFileSync('./swagger-output.json', 'utf8'));
@@ -85,7 +92,7 @@ app.post('/login', async (req, res) => {
 // ==========================================
 
 // 1. Listar todos os clientes — protegida
-app.get('/clientes', async (req, res) => {
+app.get('/clientes', autenticarToken, async (req, res) => {
   try {
     const clientes = await buscarTodosClientes();
     res.json(clientes);
@@ -126,7 +133,7 @@ app.get('/clientes/busca-email', autenticarToken, async (req, res) => {
       return res.status(404).json({ error: 'Cliente não encontrado' });
     }
 
-    delete cliente.senha; // Remove a senha antes de retornar
+    delete cliente.senha;
     res.json(cliente);
   } catch (error) {
     console.error('[GET /clientes/busca-email]', error);
