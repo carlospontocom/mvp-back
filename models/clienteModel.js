@@ -53,3 +53,26 @@ export async function deletarCliente(id) {
   const [result] = await pool.query('DELETE FROM clientes WHERE id = ?', [id]);
   return result.affectedRows > 0;
 }
+
+
+// ==========================================
+// RECUPERAR SENHA
+// ==========================================
+
+export async function buscarClientePorRecuperacao(data_nascimento, email) {
+  const [rows] = await pool.query(
+    `SELECT id, nome, email 
+     FROM clientes 
+     WHERE data_nascimento = ? AND email = ?`,
+    [data_nascimento, email]
+  );
+  return rows[0] || null;
+}
+
+export async function atualizarSenha(id, novaSenhaHash) {
+  const [result] = await pool.query(
+    'UPDATE clientes SET senha = ? WHERE id = ?',
+    [novaSenhaHash, id]
+  );
+  return result.affectedRows > 0;
+}

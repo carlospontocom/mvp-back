@@ -13,12 +13,17 @@ import {
   buscarClienteEmail,
   buscarClienteNome,
   atualizarCliente,
-  deletarCliente
+  deletarCliente,buscarClientePorRecuperacao,
+  atualizarSenha
 } from '../models/clienteModel.js';
 
 import {
   criarAgendamento,
-  buscarTodosAgendamentos
+  buscarTodosAgendamentos,
+  buscarAgendamentosPorNome,
+  buscarAgendamentosPorData,
+  atualizarAgendamento,
+  deletarAgendamento
 } from '../models/agendamentoModel.js';
 
 const app = express();
@@ -91,8 +96,8 @@ app.post('/login', async (req, res) => {
 // ROTAS DE CLIENTES
 // ==========================================
 
-// 1. Listar todos os clientes — protegida
-app.get('/clientes', autenticarToken, async (req, res) => {
+// 1. Listar todos 
+app.get('/clientes', async (req, res) => {
   try {
     const clientes = await buscarTodosClientes();
     res.json(clientes);
@@ -102,7 +107,7 @@ app.get('/clientes', autenticarToken, async (req, res) => {
   }
 });
 
-// 2. Cadastrar um novo cliente — pública (necessário para registro)
+// 2. Cadastrar um novo cliente — pública
 app.post('/clientes', async (req, res) => {
   try {
     const { nome, email, senha, data_nascimento } = req.body;
@@ -195,12 +200,43 @@ app.delete('/clientes/:id', autenticarToken, async (req, res) => {
 });
 
 
+
+// Recuperar senha — pública
+app.post('/recuperar-senha', async (req, res) => {
+  try {
+    const { data_nascimento, email, nova_senha } = req.body;
+
+    if (!data_nascimento || !email || !nova_senha) {
+      return res.status(400).json({ error: 'Data de nascimento, e-mail e nova senha são obrigatórios.' });
+    }
+
+    const cliente = await buscarClientePorRecuperacao(data_nascimento, email);
+
+    if (!cliente) {
+      return res.status(404).json({ error: 'Nenhum cliente encontrado com esses dados.' });
+    }
+
+    const novaSenhaHash = await bcrypt.hash(nova_senha, 10);
+    await atualizarSenha(cliente.id, novaSenhaHash);
+
+    res.json({ message: 'Senha atualizada com sucesso!' });
+
+  } catch (error) {
+    console.error('[POST /recuperar-senha]', error);
+    res.status(500).json({ error: 'Erro interno ao recuperar senha.' });
+  }
+});
+
+
+
+
+
 // ==========================================
 // ROTAS DE AGENDAMENTOS
 // ==========================================
 
 // 1. Listar todos os agendamentos — protegida
-app.get('/agendamentos', autenticarToken, async (req, res) => {
+app.get('/agendamentos', async (req, res) => {
   try {
     const agendamentos = await buscarTodosAgendamentos();
     res.json(agendamentos);
@@ -210,7 +246,41 @@ app.get('/agendamentos', autenticarToken, async (req, res) => {
   }
 });
 
-// 2. Criar agendamento — protegida
+// 2. Buscar agendamentos por nome do cliente — protegida
+app.get('/agendamentos/busca-nome', autenticarToken, async (req, res) => {
+  try {
+    const { nome } = req.query;
+
+    if (!nome) {
+      return res.status(400).json({ error: 'O parâmetro nome é obrigatório.' });
+    }
+
+    const agendamentos = await buscarAgendamentosPorNome(nome);
+    res.json(agendamentos);
+  } catch (error) {
+    console.error('[GET /agendamentos/busca-nome]', error);
+    res.status(500).json({ error: 'Erro ao buscar agendamentos por nome.' });
+  }
+});
+
+// 3. Buscar agendamentos por data — protegida
+app.get('/agendamentos/busca-data', autenticarToken, async (req, res) => {
+  try {
+    const { data } = req.query;
+
+    if (!data) {
+      return res.status(400).json({ error: 'O parâmetro data é obrigatório.' });
+    }
+
+    const agendamentos = await buscarAgendamentosPorData(data);
+    res.json(agendamentos);
+  } catch (error) {
+    console.error('[GET /agendamentos/busca-data]', error);
+    res.status(500).json({ error: 'Erro ao buscar agendamentos por data.' });
+  }
+});
+
+// 4. Criar agendamento — protegida
 app.post('/agendamentos', autenticarToken, async (req, res) => {
   try {
     const { data_agendamento, horario, servico, descricao, cliente_id } = req.body;
@@ -219,12 +289,9 @@ app.post('/agendamentos', autenticarToken, async (req, res) => {
       return res.status(400).json({ error: 'Data, horário, serviço e cliente_id são obrigatórios.' });
     }
 
-    const novoAgendamentoId = await criarAgendamento(data_agendamento, horario, servico, descricao, cliente_id);
+    const novoId = await criarAgendamento(data_agendamento, horario, servico, descricao, cliente_id);
 
-    res.status(201).json({
-      message: 'Agendamento realizado com sucesso!',
-      id: novoAgendamentoId
-    });
+    res.status(201).json({ message: 'Agendamento realizado com sucesso!', id: novoId });
   } catch (error) {
     console.error('[POST /agendamentos]', error);
 
@@ -233,6 +300,47 @@ app.post('/agendamentos', autenticarToken, async (req, res) => {
     }
 
     res.status(500).json({ error: 'Erro ao criar agendamento' });
+  }
+});
+
+// 5. Atualizar agendamento por ID — protegida
+app.put('/agendamentos/:id', autenticarToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data_agendamento, horario, servico, descricao } = req.body;
+
+    if (!data_agendamento || !horario || !servico) {
+      return res.status(400).json({ error: 'Data, horário e serviço são obrigatórios.' });
+    }
+
+    const atualizado = await atualizarAgendamento(id, data_agendamento, horario, servico, descricao);
+
+    if (!atualizado) {
+      return res.status(404).json({ error: 'Agendamento não encontrado para atualização.' });
+    }
+
+    res.json({ message: 'Agendamento atualizado com sucesso.' });
+  } catch (error) {
+    console.error('[PUT /agendamentos/:id]', error);
+    res.status(500).json({ error: 'Erro ao atualizar agendamento.' });
+  }
+});
+
+// 6. Deletar agendamento por ID — protegida
+app.delete('/agendamentos/:id', autenticarToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const deletado = await deletarAgendamento(id);
+
+    if (!deletado) {
+      return res.status(404).json({ error: 'Agendamento não encontrado para exclusão.' });
+    }
+
+    res.json({ message: 'Agendamento deletado com sucesso.' });
+  } catch (error) {
+    console.error('[DELETE /agendamentos/:id]', error);
+    res.status(500).json({ error: 'Erro ao deletar agendamento.' });
   }
 });
 
